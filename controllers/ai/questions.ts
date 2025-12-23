@@ -1,13 +1,17 @@
 import { GoogleGenAI, Schema, Type } from "@google/genai";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/generated/prisma/client";
 import { createQuestion } from "../questions";
 
-const prisma = new PrismaClient();
+// Recomendado: Em Next.js, use um singleton para o Prisma para evitar "Too many connections"
+// import prisma from "@/lib/prisma"; 
+const prisma = new PrismaClient(); 
 
 export const iaQuestions = async (id: number, userId: number, count: number = 5, itemCount: number = 4): Promise<any> => {
     try {
+        // Inicializa a nova SDK do Google GenAI
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
 
+        // 1. Busca os dados do Assunto (Subject)
         const subjectData = await prisma.subject.findUnique({
             where: { id },
             select: {
@@ -16,167 +20,156 @@ export const iaQuestions = async (id: number, userId: number, count: number = 5,
                 collection: { select: { userId: true } },
                 conversation: { 
                     orderBy: { createdAt: 'asc' },
-                    select: { text: true, isGenerated: true }
+                    select: { text: true, isGenerated: true },
+                    take: 20 // Limita o histórico para não estourar tokens desnecessariamente
                 }
             }
         });
 
-        if (subjectData?.collection.userId !== userId) {
-            return { statusCode: 401, message: 'Unauthorized', error: true };
+        // 2. Validação de Segurança
+        if (!subjectData || subjectData.collection.userId !== userId) {
+            return { statusCode: 401, message: 'Unauthorized or Subject not found', error: true };
         }
         
-        interface ConversationMessage {
-            text: string;
-            isGenerated: boolean;
-        }
-
-        interface SubjectData {
-            name: string;
-            resume: string | null;
-            collection: {
-                userId: number;
-            };
-            conversation: ConversationMessage[];
-        }
-
-        const conversationHistory = (subjectData as SubjectData).conversation
-            .map((msg: ConversationMessage) => 
-                `[${msg.isGenerated ? 'Tutor' : 'Student'}] ${msg.text}`
-            )
+        // 3. Formatação do Contexto
+        const conversationHistory = subjectData.conversation
+            .map(msg => `[${msg.isGenerated ? 'Tutor' : 'Student'}] ${msg.text}`)
             .join('\n');
             
-        const subjectName = subjectData.name;
-        const subjectResume = subjectData.resume;
+        const contentToAnalyze = (subjectData.resume && subjectData.resume.length > 50)
+            ? `RESUMO PRINCIPAL:\n${subjectData.resume}\n\nHISTÓRICO DE CONVERSA (Contexto Adicional):\n${conversationHistory}`
+            : `HISTÓRICO DE CONVERSA:\n${conversationHistory}`;
 
-        const contentToAnalyze = subjectResume && subjectResume.length > 0
-            ? `MAIN SUMMARY:\n${subjectResume}\n\nOR CONVERSATION HISTORY:\n${conversationHistory}`
-            : `CONVERSATION HISTORY:\n${conversationHistory}`;
-
-        if (contentToAnalyze.length < 100) {
+        if (contentToAnalyze.length < 50) {
             return { 
                 statusCode: 200, 
-                message: "Insufficient content to generate questions.", 
+                message: "Conteúdo insuficiente para gerar questões.", 
                 questionsGenerated: 0 
             };
         }
 
+        // 4. Definição do Schema (Estrutura JSON esperada)
         const QuestionItemSchema: Schema = {
             type: Type.OBJECT,
             properties: {
                 text: {
                     type: Type.STRING,
-                    description: "The text of the multiple-choice option.",
+                    description: "O texto da opção de múltipla escolha.",
                 },
                 isCorrect: {
                     type: Type.BOOLEAN,
-                    description: "True if this is the correct answer, False otherwise.",
+                    description: "True se esta for a resposta correta, False caso contrário.",
                 },
             },
             required: ["text", "isCorrect"],
         };
 
-        const QuestionSchema: Schema = {
+        const QuestionListSchema: Schema = {
             type: Type.OBJECT,
             properties: {
                 questions: {
                     type: Type.ARRAY,
-                    description: `A list of the requested ${count} multiple-choice questions.`,
+                    description: `Uma lista contendo exatamente ${count} questões.`,
                     items: {
                         type: Type.OBJECT,
                         properties: {
                             text: {
                                 type: Type.STRING,
-                                description: "The text of the main question.",
+                                description: "O enunciado da pergunta.",
                             },
                             items: {
                                 type: Type.ARRAY,
-                                description: `A list of exactly ${itemCount} options for the multiple-choice question. Exactly one item must have isCorrect: true.`,
+                                description: `Uma lista com exatamente ${itemCount} opções de resposta.`,
                                 items: QuestionItemSchema,
-                                minItems: itemCount.toString(),
-                                maxItems: itemCount.toString(),
                             },
                         },
                         required: ["text", "items"],
                     },
-                    minItems: "1",
                 },
             },
             required: ["questions"],
         };
 
-
-        const prompt = `You are an Academic Assessment Creator.
+        // 5. Construção do Prompt
+        const prompt = `
+        Você é um Criador de Avaliações Acadêmicas.
+        Tópico: ${subjectData.name}
         
-        Topic: ${subjectName}
+        Instruções:
+        1. Gere **${count} perguntas de múltipla escolha** baseadas no conteúdo abaixo.
+        2. Cada pergunta deve ter **exatamente ${itemCount} opções** ('items').
+        3. Apenas uma opção deve ser verdadeira ('isCorrect: true').
+        4. O objetivo é testar a compreensão e retenção dos conceitos.
         
-        Instructions:
-        1. Generate **${count} multiple-choice questions** based on the content provided below.
-        2. Each question must have **exactly ${itemCount} options** ('items').
-        3. For each question, **only one option** must have 'isCorrect: true'.
-        4. The goal of the questions is to test comprehension and retention of the discussed concepts.
-        5. Provide the output strictly in the JSON format defined by the Schema.
-        
-        Content for Analysis:
-        --- CONTENT START ---
+        Conteúdo para Análise:
+        --- INÍCIO ---
         ${contentToAnalyze}
-        --- CONTENT END ---
+        --- FIM ---
         
-        Generate the JSON with the questions:`;
+        Responda estritamente com o JSON conforme o Schema.
+        `;
 
+        // 6. Chamada à API do Gemini
         const result = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
+            model: "gemini-2.5-flash", // Modelo estável e rápido (ou use gemini-2.0-flash-exp)
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: prompt }]
+                }
+            ],
             config: {
                 responseMimeType: "application/json",
-                responseSchema: QuestionSchema,
-                temperature: 0.3,
+                responseSchema: QuestionListSchema,
+                temperature: 0.3, // Temperatura baixa para respostas mais determinísticas
             }
         });
 
-        const questionsJsonString = result?.text?.trim() || "";
-        
+        const questionsJsonString = result?.text;
+
         if (!questionsJsonString) {
-            console.error("Gemini returned an empty response text.");
-            return { 
-                statusCode: 500, 
-                message: "AI failed to generate structured content (empty response).", 
-                questionsGenerated: 0 
-            };
+            console.error("Gemini retornou texto vazio.");
+            return { statusCode: 500, message: "Erro na geração da IA (Resposta vazia).", error: true };
         }
 
+        // 7. Parse e Validação
         let questionsObject;
         try {
-            questionsObject = JSON.parse(questionsJsonString) as { questions: Array<{ text: string, items: Array<{ text: string, isCorrect: boolean }> }> };
+            questionsObject = JSON.parse(questionsJsonString);
         } catch (jsonError) {
-            console.error("JSON Parsing failed! Raw AI Text:", questionsJsonString);
-            console.error("JSON Error:", jsonError);
-            return {
-                statusCode: 500,
-                message: "Internal Error: Failed to parse AI response into JSON.",
-                error: true
-            };
+            console.error("Erro ao fazer parse do JSON:", questionsJsonString);
+            return { statusCode: 500, message: "Falha ao processar resposta da IA.", error: true };
         }
 
+        if (!questionsObject.questions || !Array.isArray(questionsObject.questions)) {
+             return { statusCode: 500, message: "Formato de JSON inválido retornado pela IA.", error: true };
+        }
+
+        // 8. Salvar no Banco de Dados
         const createdQuestions = [];
 
         for (const q of questionsObject.questions) {
+            // Validação simples para garantir que temos opções
+            if (!q.items || q.items.length === 0) continue;
+
             const questionData = {
                 subjectId: id,
                 text: q.text,
-                items: JSON.stringify(q.items),
+                items: JSON.stringify(q.items), // O Prisma espera String/JSON aqui
             };
+
             const newQuestion = await createQuestion(questionData as any);
             createdQuestions.push(newQuestion);
         }
 
         return { 
             statusCode: 200, 
-            message: `${createdQuestions.length} questions generated and saved successfully.`,
+            message: `${createdQuestions.length} questões geradas com sucesso.`,
             questions: createdQuestions
         };
 
-    } catch(error) {
-        console.error("FATAL ERROR in iaQuestions (Connection/Prisma/Unknown):", error); 
-        return { statusCode: 500, message: "Internal Server Error", error: true };    
+    } catch (error) {
+        console.error("ERRO FATAL em iaQuestions:", error); 
+        return { statusCode: 500, message: "Erro Interno do Servidor", error: true };    
     }
-}
+};

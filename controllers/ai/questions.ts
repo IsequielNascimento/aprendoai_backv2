@@ -25,8 +25,22 @@ export const iaQuestions = async (id: number, userId: number, count: number = 5,
             return { statusCode: 401, message: 'Unauthorized', error: true };
         }
         
-        const conversationHistory = subjectData.conversation
-            .map(msg => 
+        interface ConversationMessage {
+            text: string;
+            isGenerated: boolean;
+        }
+
+        interface SubjectData {
+            name: string;
+            resume: string | null;
+            collection: {
+                userId: number;
+            };
+            conversation: ConversationMessage[];
+        }
+
+        const conversationHistory = (subjectData as SubjectData).conversation
+            .map((msg: ConversationMessage) => 
                 `[${msg.isGenerated ? 'Tutor' : 'Student'}] ${msg.text}`
             )
             .join('\n');

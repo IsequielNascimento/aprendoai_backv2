@@ -42,7 +42,12 @@ export const guidedStudy = async (subjectId: number, userId: number): Promise<an
             ? `- ${subjectData.question.map((q: { text: string }) => q.text).join('\n- ')}`
             : 'No specific test questions were provided. Please create your own questions and exercises to test the user.';
 
-        const history = subjectData.conversation.map(msg => 
+        interface ConversationMessage {
+            text: string;
+            isGenerated: boolean;
+        }
+
+        const history = subjectData.conversation.map((msg: ConversationMessage) => 
             `${msg.isGenerated ? 'Tutor' : 'User'}: ${msg.text}`
         ).join('\n') || "No prior conversation history. Start the session.";
 

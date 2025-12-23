@@ -1,5 +1,5 @@
 import { GoogleGenAI, Schema, Type } from "@google/genai";
-import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { createQuestion } from "../questions";
 
 const prisma = new PrismaClient();

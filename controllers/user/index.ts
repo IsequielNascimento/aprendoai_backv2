@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { genereteToken } from "@/utils/jwt";
 import { UserSerializer } from "@/utils/serializers/userSerializer";
 import bcrypt from "bcryptjs";

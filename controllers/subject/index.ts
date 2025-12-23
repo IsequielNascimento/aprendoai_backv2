@@ -1,7 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
+import prisma from "@/lib/prisma";
 export const fetchSubjects = async (collectionId: number) => {
   try {
     const subjects = await prisma.subject.findMany({where: { collectionId }});
@@ -34,9 +33,15 @@ export const fetchSubject = async (id: number) => {
   }  
 }
 
-export const createSubject = async (data: Prisma.SubjectCreateInput) => {
+export const createSubject = async (data: { name: string, collectionId: number, image?: string | null }) => {
   try {
-    const subject = await prisma.subject.create({ data });
+    const subject = await prisma.subject.create({ 
+      data: {
+        name: data.name,
+        collectionId: data.collectionId,
+        image: data.image // Passando a imagem Base64
+      } 
+    });
 
     if(!subject) return {statusCode: 400, message: "Bad request", error: true};
 

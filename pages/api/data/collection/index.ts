@@ -30,22 +30,22 @@ export default async function Handle(req: NextApiRequest, res: NextApiResponse) 
     case 'POST': {
       const form = formidable({
         keepExtensions: true,
-        maxFileSize: 10 * 1024 * 1024, // Limite de 10MB
-      });
-
-      const data: any = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) return reject(err);
-          resolve({ fields, files });
-        });
+        maxFileSize: 10 * 1024 * 1024,
+        allowEmptyFiles: true,
+        minFileSize: 0,
       });
 
       try {
+        const data: any = await new Promise((resolve, reject) => {
+          form.parse(req, (err, fields, files) => {
+            if (err) return reject(err);
+            resolve({ fields, files });
+          });
+        });
 
         const name = Array.isArray(data.fields.name) ? data.fields.name[0] : data.fields.name;
         
         let imageBase64 = null;
-
         const file = data.files.file?.[0] || data.files.file;
         
         if (file) {
@@ -63,7 +63,7 @@ export default async function Handle(req: NextApiRequest, res: NextApiResponse) 
         return res.status(response?.statusCode || 201).json(response);
 
       } catch (error) {
-        console.error("Erro no upload:", error);
+        console.error("Erro no upload collection:", error);
         return res.status(500).json({ message: 'Erro ao processar upload', error: true });
       }
     }

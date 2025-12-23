@@ -4,7 +4,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import formidable from "formidable";
 import fs from "fs";
 
-// 1. Desativa o bodyParser
+// 1. Desativa o bodyParser padrão do Next.js para aceitar arquivos
 export const config = {
   api: {
     bodyParser: false,
@@ -17,8 +17,6 @@ export default async function Handle(req: NextApiRequest, res: NextApiResponse) 
 
   if (!guard.isValid) return res.status(401).json({ message: 'Unauthorized', error: true });
 
-  const userId = Number(guard.user.id);
-
   switch (req.method) {
     case 'GET': {
       const collectionId = Number(req.query.collectionId);
@@ -30,13 +28,16 @@ export default async function Handle(req: NextApiRequest, res: NextApiResponse) 
     }
 
     case 'POST': {
-      // 2. Configura Formidable
+      // Configura o Formidable
       const form = formidable({
         keepExtensions: true,
         maxFileSize: 10 * 1024 * 1024, // 10MB
+        allowEmptyFiles: true,
+        minFileSize: 0,
       });
 
       try {
+        // Promise para processar o form
         const data: any = await new Promise((resolve, reject) => {
           form.parse(req, (err, fields, files) => {
             if (err) return reject(err);
@@ -44,26 +45,27 @@ export default async function Handle(req: NextApiRequest, res: NextApiResponse) 
           });
         });
 
-        // Extrai campos
+        // Extrai campos de texto (Formidable pode retornar array ou string)
         const name = Array.isArray(data.fields.name) ? data.fields.name[0] : data.fields.name;
         const collectionId = Array.isArray(data.fields.collectionId) ? data.fields.collectionId[0] : data.fields.collectionId;
 
+        // Processa Imagem
         let imageBase64 = null;
-        
-        // Processa imagem
-        const file = data.files.file?.[0] || data.files.file;
+        const file = data.files.file?.[0] || data.files.file; // Suporte a versões novas e velhas do formidable
+
         if (file) {
           const fileData = fs.readFileSync(file.filepath);
+          // Cria a string Base64 completa
           imageBase64 = `data:${file.mimetype};base64,${fileData.toString('base64')}`;
         }
 
         const subjectData = {
           name: name,
           collectionId: Number(collectionId),
-
+          image: imageBase64, 
         };
 
-        const response = await createSubject(subjectData as any);
+        const response = await createSubject(subjectData);
         
         return res.status(response?.statusCode || 201).json(response);
 

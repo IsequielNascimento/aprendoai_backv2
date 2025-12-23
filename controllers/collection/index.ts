@@ -1,7 +1,6 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
+import prisma from "@/lib/prisma";
 export const fetchCollections = async (userId: number) => {
   try {
     const collections = await prisma.collection.findMany({
@@ -40,11 +39,15 @@ export const fetchCollection = async (id: number) => {
   }
 }
 
-export const createCollection = async (data: any) => { 
+export const createCollection = async (data: { name: string, userId: number, image?: string | null }) => { 
   try {
-    console.log("Tentando criar coleção com dados:", data); // DEBUG 1
-
-    const collection = await prisma.collection.create({ data });
+    const collection = await prisma.collection.create({ 
+      data: {
+        name: data.name,
+        userId: data.userId,
+        image: data.image 
+      } 
+    });
 
     if(!collection) return {statusCode: 400, message: "Erro ao criar", error: true};
 

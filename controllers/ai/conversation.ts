@@ -1,12 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { PrismaClient } from "@prisma/client";
+import prisma from "../../lib/prisma";
 import { createConversation } from "../conversation";
-
-const prisma = new PrismaClient();
 
 export const guidedStudy = async (subjectId: number, userId: number): Promise<any> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY || "");
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
 
         const subjectData = await prisma.subject.findUnique({
             where: { id: subjectId },
@@ -37,8 +37,9 @@ export const guidedStudy = async (subjectId: number, userId: number): Promise<an
             ? subjectData.resume
             : `The main study topic is: **${subjectTitle}**. You do not have pre-written summary content, so use your internal knowledge about this subject to guide the session.`;
 
+        // Definimos explicitamente que 'q' é um objeto com uma string 'text'
         const formattedQuestions = subjectData.question.length > 0
-            ? `- ${subjectData.question.map(q => q.text).join('\n- ')}`
+            ? `- ${subjectData.question.map((q: { text: string }) => q.text).join('\n- ')}`
             : 'No specific test questions were provided. Please create your own questions and exercises to test the user.';
 
         const history = subjectData.conversation.map(msg => 
@@ -72,12 +73,8 @@ export const guidedStudy = async (subjectId: number, userId: number): Promise<an
               
           Your next response (and only the next response) must be:`;
 
-        const result = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-        });
-
-        const aiResponseText = result?.text?.trim();
+        const result = await model.generateContent(prompt);
+        const aiResponseText = result.response.text();
 
         const iaConversation = { 
             text: aiResponseText, 

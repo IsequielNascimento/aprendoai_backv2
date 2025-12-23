@@ -5,7 +5,6 @@ import bcrypt from "bcryptjs";
 
 import prisma from "@/lib/prisma";
 
-
 export const fetchUser = async (id: number) => {
   try {
     const user = await prisma.user.findUnique({
@@ -34,12 +33,26 @@ type LoginInput = {
 
 export const loginUser = async (userData: LoginInput): Promise<any> => {
   try {
+    // Busca o usuário e suas coleções (para retornar no data)
     const user = await prisma.user.findUnique({ where: { email: userData.email }, include: {collection: true} });
-     if (user) {
+    
+    if (user) {
       const isPasswordValid = await bcrypt.compare(userData.password || '', user.password);
+      
       if (isPasswordValid) {
-        const token = genereteToken(user);
-        const userSerialized = UserSerializer(user)
+        
+        // --- CORREÇÃO AQUI ---
+        // NÃO passamos o 'user' inteiro, pois ele tem imagens pesadas.
+        // Criamos um payload leve apenas para identificação.
+        const tokenPayload = {
+            id: user.id,
+            email: user.email
+        };
+        const token = genereteToken(tokenPayload); 
+        // ---------------------
+
+        const userSerialized = UserSerializer(user);
+        
         return { token, data: userSerialized, statusCode: 200 };
       } 
       return { message: "Senha inválida", statusCode: 400, error: false };
@@ -55,9 +68,17 @@ export const createUser = async (userData: Prisma.UserCreateInput): Promise<any>
     const cryptPassword = await bcrypt.hash(userData.password, 10);
     const cryptUserData = {...userData, password: cryptPassword}
     const user = await prisma.user.create({data: cryptUserData})
+    
     if (!user) return {statusCode: 400, message: "Bad request", error: true};
     
-    const token = genereteToken(user);
+    // --- CORREÇÃO AQUI TAMBÉM ---
+    const tokenPayload = {
+        id: user.id,
+        email: user.email
+    };
+    const token = genereteToken(tokenPayload);
+    // ----------------------------
+
     return {statusCode: 201, message: "Conta criada", error: false, token};
 
   } catch (error) {

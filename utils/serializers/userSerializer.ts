@@ -1,15 +1,10 @@
-import { Prisma } from "@/generated/prisma/browser";
+import { Prisma } from "@prisma/client";
 
-type dataUser = {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
+type DataUser = Prisma.UserGetPayload<{
+  include: { collection: true };
+}>;
 
-  collection: Prisma.CollectionModel[];
-}
-
-export const UserSerializer = (user: dataUser) => ({
+export const UserSerializer = (user: DataUser) => ({
   id: user.id,
   email: user.email,
   firstName: user.firstName,

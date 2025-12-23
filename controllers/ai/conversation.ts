@@ -6,7 +6,7 @@ import { createConversation } from "../conversation";
 export const guidedStudy = async (subjectId: number, userId: number): Promise<any> => {
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY || "");
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+        const model = genAI.getGenerativeModel({ model: "gemma-3-12b" }); 
 
         const subjectData = await prisma.subject.findUnique({
             where: { id: subjectId },

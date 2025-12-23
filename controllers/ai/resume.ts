@@ -68,7 +68,7 @@ export const iaResume = async (id: number, userId: number): Promise<any> => {
           Your Summary (ONLY the summary content, no introductions):`;
 
         const result = await ai.models.generateContent({
-            model: "gemma-3-12b",
+            model: "gemini-3-flash",
             contents: prompt
         });
 

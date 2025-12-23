@@ -111,7 +111,7 @@ export const iaQuestions = async (id: number, userId: number, count: number = 5,
 
         // 6. Chamada à API do Gemini
         const result = await ai.models.generateContent({
-            model: "gemini-3-flash", // Modelo estável e rápido (ou use gemini-2.0-flash-exp)
+            model: "gemini-2.5-flash-lite", // Modelo estável e rápido (ou use gemini-2.0-flash-exp)
             contents: [
                 {
                     role: "user",

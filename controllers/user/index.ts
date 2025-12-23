@@ -3,7 +3,8 @@ import { genereteToken } from "@/utils/jwt";
 import { UserSerializer } from "@/utils/serializers/userSerializer";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+
 
 export const fetchUser = async (id: number) => {
   try {

@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -58,7 +58,7 @@ export const createCollection = async (data: any) => {
   }
 }
 
-export const updateCollection = async (id: number, data: Partial<Prisma.CollectionModel>, userId: number) => {
+export const updateCollection = async (id: number, data: Partial<Prisma.CollectionUpdateInput>, userId: number) => {
   try {
 
     const collection = await prisma.collection.update({where: {id, userId}, data })

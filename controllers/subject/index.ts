@@ -34,7 +34,7 @@ export const fetchSubject = async (id: number) => {
   }  
 }
 
-export const createSubject = async (data: Prisma.SubjectModel) => {
+export const createSubject = async (data: Prisma.SubjectCreateInput) => {
   try {
     const subject = await prisma.subject.create({ data });
 
@@ -48,7 +48,7 @@ export const createSubject = async (data: Prisma.SubjectModel) => {
   }
 }
 
-export const updateSubject = async (id: number, data: Partial<Prisma.SubjectModel>) => {
+export const updateSubject = async (id: number, data: Partial<Prisma.SubjectUpdateInput>) => {
   try {
     const subject = await prisma.subject.update({where: { id }, data })
 

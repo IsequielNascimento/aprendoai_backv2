@@ -26,7 +26,7 @@ export const fetchConversation = async (id: number) => {
   }  
 }
 
-export const createConversation = async (data: Prisma.ConversationModel) => {
+export const createConversation = async (data: Prisma.ConversationCreateInput) => {
   try {
     const conversation = await prisma.conversation.create({ data });
 
@@ -40,7 +40,7 @@ export const createConversation = async (data: Prisma.ConversationModel) => {
   }
 }
 
-export const updateConversation = async (id: number, data: Partial<Prisma.ConversationModel>) => {
+export const updateConversation = async (id: number, data: Prisma.ConversationUpdateInput) => {
   try {
     const conversation = await prisma.conversation.update({where: { id }, data })
 

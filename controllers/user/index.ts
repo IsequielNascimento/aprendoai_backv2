@@ -26,7 +26,12 @@ export const fetchUser = async (id: number) => {
   }
 }
 
-export const loginUser = async(userData: Partial<Prisma.UserModel>): Promise<any> => {
+type LoginInput = {
+  email: string;
+  password: string;
+};
+
+export const loginUser = async (userData: LoginInput): Promise<any> => {
   try {
     const user = await prisma.user.findUnique({ where: { email: userData.email }, include: {collection: true} });
      if (user) {
@@ -44,7 +49,7 @@ export const loginUser = async(userData: Partial<Prisma.UserModel>): Promise<any
   }
 }
 
-export const createUser = async (userData: Prisma.UserModel): Promise<any> => {
+export const createUser = async (userData: Prisma.UserCreateInput): Promise<any> => {
   try {
     const cryptPassword = await bcrypt.hash(userData.password, 10);
     const cryptUserData = {...userData, password: cryptPassword}
@@ -67,7 +72,7 @@ export const createUser = async (userData: Prisma.UserModel): Promise<any> => {
   }
 }
 
-export const updateUser = async (userData: Partial<Prisma.UserModel>, id: number) => {
+export const updateUser = async (userData: Partial<Prisma.UserUpdateInput>, id: number) => {
   try {
     const user = await prisma.user.update({where: { id }, data: userData})
     if (!user) return {statusCode: 400, message: "Bad request", error: true};
